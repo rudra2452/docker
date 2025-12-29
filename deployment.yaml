@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rudradocker-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rudradocker
+  template:
+    metadata:
+      labels:
+        app: rudradocker
+    spec:
+      containers:
+      - name: rudradocker-container
+        image: ubuntuacr.azurecr.io/rudradocker:latest # The pipeline will update this tag automatically
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rudradocker-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: rudradocker
