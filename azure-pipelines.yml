@@ -2,7 +2,6 @@ trigger:
 - main
 
 variables:
-  # Keep these as they were
   dockerRegistryServiceConnection: '173e65ea-dbc2-4ffd-99fa-a405e0e920a5'
   imageRepository: 'rudradocker'
   containerRegistry: 'ubuntuacr.azurecr.io'
@@ -11,18 +10,15 @@ variables:
 
 stages:
 - stage: Build
-  displayName: Build and push stage
+  displayName: Build and Push
   jobs:
   - job: Build
-    displayName: Build
-    # CHANGE THIS SECTION:
     pool:
-      name: 'Default'  # Your pool name
-      demands:
-      - Agent.Name -equals PREM-Ubuntu # Optional: forces it to use this exact agent
+      name: 'Default'
+      demands: [ Agent.Name -equals PREM-Ubuntu ]
     steps:
     - task: Docker@2
-      displayName: Build and push an image to container registry
+      displayName: Build and Push to ACR
       inputs:
         command: buildAndPush
         repository: $(imageRepository)
@@ -31,3 +27,19 @@ stages:
         tags: |
           $(tag)
           latest
+
+- stage: Deploy
+  displayName: Deploy to Azure Web App
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: Deploy
+    pool:
+      name: 'Default'
+    steps:
+    - task: AzureWebAppContainer@1
+      displayName: 'Update Web App Image'
+      inputs:
+        azureSubscription: 'docker-ARM' # Use your new ARM connection name
+        appName: 'rudra-webapp-2025' # Use your actual Web App name
+        containers: '$(containerRegistry)/$(imageRepository):$(tag)'
