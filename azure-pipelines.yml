@@ -1,0 +1,33 @@
+trigger:
+- main
+
+variables:
+  # Keep these as they were
+  dockerRegistryServiceConnection: '173e65ea-dbc2-4ffd-99fa-a405e0e920a5'
+  imageRepository: 'rudradocker'
+  containerRegistry: 'ubuntuacr.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    # CHANGE THIS SECTION:
+    pool:
+      name: 'Default'  # Your pool name
+      demands:
+      - Agent.Name -equals PREM-Ubuntu # Optional: forces it to use this exact agent
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
