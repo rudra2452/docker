@@ -2,15 +2,19 @@ trigger:
 - main
 
 variables:
+  # Using IDs for maximum reliability
   dockerRegistryServiceConnection: '173e65ea-dbc2-4ffd-99fa-a405e0e920a5'
+  aksServiceConnection: '9495e3d0-ca92-417f-b0f1-2e516633dec9' # Your K8s ID
+  
   imageRepository: 'rudradocker'
   containerRegistry: 'ubuntuacr.azurecr.io'
   dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
   tag: '$(Build.BuildId)'
 
 stages:
+# --- STAGE 1: Build Image on your Self-Hosted Agent ---
 - stage: Build
-  displayName: Build and Push
+  displayName: 'Build and Push'
   jobs:
   - job: Build
     pool:
@@ -18,7 +22,7 @@ stages:
       demands: [ Agent.Name -equals PREM-Ubuntu ]
     steps:
     - task: Docker@2
-      displayName: Build and Push to ACR
+      displayName: 'Build and Push to ACR'
       inputs:
         command: buildAndPush
         repository: $(imageRepository)
@@ -28,18 +32,28 @@ stages:
           $(tag)
           latest
 
+# --- STAGE 2: Deploy to AKS using Manifests ---
 - stage: Deploy
-  displayName: Deploy to Azure Web App
+  displayName: 'Deploy to AKS'
   dependsOn: Build
   condition: succeeded()
   jobs:
-  - job: Deploy
+  - deployment: Deploy
+    displayName: 'Deploy Job'
     pool:
-      name: 'Default'
-    steps:
-    - task: AzureWebAppContainer@1
-      displayName: 'Update Web App Image'
-      inputs:
-        azureSubscription: 'docker-ARM' # Use your new ARM connection name
-        appName: 'rudra-webapp-2025' # Use your actual Web App name
-        containers: '$(containerRegistry)/$(imageRepository):$(tag)'
+      name: 'Default' # Runs on your self-hosted pool
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: 'Deploy to AKS'
+            inputs:
+              action: deploy
+              kubernetesServiceConnection: $(aksServiceConnection)
+              namespace: 'default'
+              manifests: |
+                $(System.DefaultWorkingDirectory)/deployment.yaml
+              containers: |
+                $(containerRegistry)/$(imageRepository):$(tag)
